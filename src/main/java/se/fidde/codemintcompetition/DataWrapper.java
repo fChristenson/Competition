@@ -26,4 +26,10 @@ public class DataWrapper {
     public void setTemperature(double temperature2) {
         this.temperature = temperature2;
     }
+
+    @Override
+    public String toString() {
+        return "DataWrapper [year=" + year + ", temperature=" + temperature
+                + "]";
+    }
 }

@@ -1,11 +1,14 @@
 package se.fidde.codemintcompetition;
 
+import java.io.BufferedWriter;
 import java.io.File;
+import java.io.FileWriter;
+import java.io.IOException;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.HashSet;
 import java.util.List;
 import java.util.concurrent.ForkJoinPool;
-import java.util.concurrent.ForkJoinTask;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
 
@@ -18,17 +21,22 @@ public class Main {
         validateFolderToScan(folderToScan);
 
         List<File> folders = getFolders(folderToScan);
+        ForkJoinPool pool = new ForkJoinPool();
+        Collection<DataWrapper> result = new HashSet<>();
 
-        ForkJoinPool forkJoinPool = new ForkJoinPool();
-        FolderHandler folderHandler = new FolderHandler(folders);
+        folders.forEach(file -> {
+            File[] listFiles = file.listFiles();
+            List<File> filterList = filterList(listFiles);
+
+            GzipHandler gzipHandler = new GzipHandler(filterList);
+            Collection<DataWrapper> invoke = pool.invoke(gzipHandler);
+            result.addAll(invoke);
+        });
 
         System.out.println("Processing...");
-        ForkJoinTask<Collection<String>> submit = forkJoinPool
-                .submit(folderHandler);
 
         try {
-            Collection<String> join = submit.join();
-            writeDataToFile(join);
+            writeDataToFile(result, args[1]);
 
             System.out.println("Processing done.");
             System.out.println("Shutting down.");
@@ -60,8 +68,21 @@ public class Main {
         return collect;
     }
 
-    private static void writeDataToFile(Collection<String> join) {
-        System.out.println(join.size());
+    private static void writeDataToFile(Collection<DataWrapper> result,
+            String fileName) throws IOException {
+        File file = new File(fileName);
+        FileWriter fileWriter = new FileWriter(file);
+        BufferedWriter bufferedWriter = new BufferedWriter(fileWriter);
+
+        result.forEach(dataWrapper -> {
+            try {
+                bufferedWriter.write(dataWrapper.toString());
+                bufferedWriter.newLine();
+
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        });
     }
 
     private static void validateFolderToScan(File folderToScan) {
@@ -81,5 +102,20 @@ public class Main {
                     .println("Please use: <folder to scan> <outputfile> <optional:invalid posts outputfile>");
             System.exit(0);
         }
+    }
+
+    private static List<File> filterList(File[] listFiles) {
+        List<File> asList = Arrays.asList(listFiles);
+        Predicate<? super File> predicate = file -> {
+            if (file.isDirectory()
+                    || !file.getName().matches("\\d{6}-\\d{5}-\\d{4}.gz"))
+                return false;
+
+            return true;
+        };
+        List<File> collect = asList.stream().filter(predicate)
+                .collect(Collectors.toList());
+
+        return collect;
     }
 }

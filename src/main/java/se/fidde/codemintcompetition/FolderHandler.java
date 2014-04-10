@@ -24,7 +24,7 @@ public class FolderHandler extends RecursiveTask<Collection<String>> {
 
     @Override
     protected Collection<String> compute() {
-        if (foldersWithGzipFiles.size() == 1) {
+        if (foldersWithGzipFiles.size() <= 1) {
             try {
                 return getData(foldersWithGzipFiles);
 
@@ -70,10 +70,8 @@ public class FolderHandler extends RecursiveTask<Collection<String>> {
         GzipHandler gzipHandler = new GzipHandler(gzipFiles);
 
         ForkJoinPool forkJoinPool = new ForkJoinPool();
-        ForkJoinTask<Collection<DataWrapper>> submit = forkJoinPool
-                .submit(gzipHandler);
+        Collection<DataWrapper> collection = forkJoinPool.invoke(gzipHandler);
 
-        Collection<DataWrapper> collection = submit.get();
         return filterData(collection);
     }
 

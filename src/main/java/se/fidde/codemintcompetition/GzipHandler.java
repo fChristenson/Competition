@@ -26,7 +26,7 @@ public class GzipHandler extends RecursiveTask<Collection<DataWrapper>> {
 
     @Override
     protected Collection<DataWrapper> compute() {
-        if (files.size() == 1)
+        if (files.size() <= 1)
             try {
                 return getData(files);
 
