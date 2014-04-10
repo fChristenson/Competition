@@ -5,16 +5,13 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStreamReader;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ForkJoinTask;
 import java.util.concurrent.RecursiveTask;
 import java.util.zip.GZIPInputStream;
 
-public class GzipHandler extends RecursiveTask<Collection<DataWrapper>> {
+public class GzipHandler extends RecursiveTask<DataWrapper> {
 
     private static final long serialVersionUID = 1L;
     private List<File> files;
@@ -25,14 +22,15 @@ public class GzipHandler extends RecursiveTask<Collection<DataWrapper>> {
     }
 
     @Override
-    protected Collection<DataWrapper> compute() {
+    protected DataWrapper compute() {
         if (files.size() <= 1)
             try {
                 return getData(files);
 
             } catch (IOException e1) {
                 e1.printStackTrace();
-                return Collections.emptyList();
+                return DataWrapper.getEmptyWrapper();
+
             }
 
         int mid = files.size() / 2;
@@ -44,24 +42,24 @@ public class GzipHandler extends RecursiveTask<Collection<DataWrapper>> {
         List<File> gzipFiles2 = files.subList(mid, end);
         GzipHandler gzipHandler2 = new GzipHandler(gzipFiles2);
 
-        ForkJoinTask<Collection<DataWrapper>> fork = gzipHandler.fork();
-        ForkJoinTask<Collection<DataWrapper>> fork2 = gzipHandler2.fork();
+        ForkJoinTask<DataWrapper> fork = gzipHandler.fork();
+        ForkJoinTask<DataWrapper> fork2 = gzipHandler2.fork();
 
         try {
-            Collection<DataWrapper> collection = fork.get();
-            Collection<DataWrapper> collection2 = fork2.get();
-            collection.addAll(collection2);
+            DataWrapper wrapper = fork.get();
+            DataWrapper wrapper2 = fork2.get();
+            wrapper.getTemperatureCollection().addAll(
+                    wrapper2.getTemperatureCollection());
 
-            return collection;
+            return wrapper;
 
         } catch (InterruptedException | ExecutionException e) {
             e.printStackTrace();
-            return Collections.emptyList();
+            return DataWrapper.getEmptyWrapper();
         }
     }
 
-    private Collection<DataWrapper> getData(List<File> files)
-            throws IOException {
+    private DataWrapper getData(List<File> files) throws IOException {
 
         File file = files.get(0);
         FileInputStream fileInputStream = new FileInputStream(file);
@@ -69,22 +67,29 @@ public class GzipHandler extends RecursiveTask<Collection<DataWrapper>> {
         InputStreamReader inputStreamReader = new InputStreamReader(gzipIs);
         BufferedReader bufferedReader = new BufferedReader(inputStreamReader);
 
-        Collection<DataWrapper> result = new ArrayList<>();
         String line = bufferedReader.readLine();
 
+        String year = getYear(line);
+        DataWrapper dataWrapper = new DataWrapper(year);
+
         while (line != null) {
-            String year = line.substring(0, 4);
             String temperatureString = line.substring(13, 19);
 
             temperatureString = temperatureString.trim();
             double temperature = Double.valueOf(temperatureString) / 10;
 
-            DataWrapper dataWrapper = new DataWrapper(year, temperature);
-
-            result.add(dataWrapper);
+            dataWrapper.getTemperatureCollection().add(temperature);
             line = bufferedReader.readLine();
         }
         bufferedReader.close();
-        return result;
+        return dataWrapper;
+    }
+
+    private String getYear(String line) {
+        if (line != null) {
+            String year = line.substring(0, 4);
+            return year;
+        }
+        return null;
     }
 }

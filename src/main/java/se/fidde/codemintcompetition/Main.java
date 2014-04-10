@@ -4,9 +4,9 @@ import java.io.BufferedWriter;
 import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
-import java.util.HashSet;
 import java.util.List;
 import java.util.concurrent.ForkJoinPool;
 import java.util.function.Predicate;
@@ -20,20 +20,22 @@ public class Main {
         File folderToScan = new File(args[0]);
         validateFolderToScan(folderToScan);
 
-        List<File> folders = getFolders(folderToScan);
+        System.out.println("Processing...");
+
+        List<File> folders = getSubFolders(folderToScan);
         ForkJoinPool pool = new ForkJoinPool();
-        Collection<DataWrapper> result = new HashSet<>();
+        Collection<DataWrapper> result = new ArrayList<DataWrapper>();
 
         folders.forEach(file -> {
             File[] listFiles = file.listFiles();
-            List<File> filterList = filterList(listFiles);
+            List<File> filterList = filterFiles(listFiles);
 
             GzipHandler gzipHandler = new GzipHandler(filterList);
-            Collection<DataWrapper> invoke = pool.invoke(gzipHandler);
-            result.addAll(invoke);
-        });
+            DataWrapper dataFromFolder = pool.invoke(gzipHandler);
 
-        System.out.println("Processing...");
+            // TODO: use filters to get only the relevant entry
+            result.add(dataFromFolder);
+        });
 
         try {
             writeDataToFile(result, args[1]);
@@ -47,14 +49,14 @@ public class Main {
         }
     }
 
-    private static List<File> getFolders(File folderToScan) {
+    private static List<File> getSubFolders(File folderToScan) {
         File[] listFiles = folderToScan.listFiles();
-        List<File> folders = filter(listFiles);
+        List<File> folders = filterFolders(listFiles);
 
         return folders;
     }
 
-    private static List<File> filter(File[] listFiles) {
+    private static List<File> filterFolders(File[] listFiles) {
         List<File> asList = Arrays.asList(listFiles);
         Predicate<? super File> predicate = file -> {
             if (file.isDirectory())
@@ -62,10 +64,10 @@ public class Main {
 
             return false;
         };
-        List<File> collect = asList.stream().filter(predicate)
+        List<File> result = asList.stream().filter(predicate)
                 .collect(Collectors.toList());
 
-        return collect;
+        return result;
     }
 
     private static void writeDataToFile(Collection<DataWrapper> result,
@@ -76,13 +78,61 @@ public class Main {
 
         result.forEach(dataWrapper -> {
             try {
-                bufferedWriter.write(dataWrapper.toString());
-                bufferedWriter.newLine();
+                writeYear(bufferedWriter, dataWrapper);
+                writeMinTemperature(bufferedWriter, dataWrapper);
+                writeAvgTemperature(bufferedWriter, dataWrapper);
+                writeMaxTemperature(bufferedWriter, dataWrapper);
 
             } catch (Exception e) {
                 e.printStackTrace();
+
+            } finally {
+                try {
+                    bufferedWriter.close();
+                    fileWriter.close();
+
+                } catch (Exception e) {
+                    e.printStackTrace();
+                }
             }
         });
+    }
+
+    private static void writeMaxTemperature(BufferedWriter bufferedWriter,
+            DataWrapper dataWrapper) throws IOException {
+
+        double maxTemperature = dataWrapper.getMaxTemperature();
+        String format = String.format("Max temp: %s Celcius", maxTemperature);
+
+        bufferedWriter.write(format);
+        bufferedWriter.newLine();
+    }
+
+    private static void writeMinTemperature(BufferedWriter bufferedWriter,
+            DataWrapper dataWrapper) throws IOException {
+
+        double minTemperature = dataWrapper.getMinTemperature();
+        String format = String.format("Min temp: %s Celcius", minTemperature);
+
+        bufferedWriter.write(format);
+        bufferedWriter.newLine();
+    }
+
+    private static void writeAvgTemperature(BufferedWriter bufferedWriter,
+            DataWrapper dataWrapper) throws IOException {
+
+        double avgTemperature = dataWrapper.getAvgTemperature();
+        String format = String.format("Avg temp: %s Celcius", avgTemperature);
+
+        bufferedWriter.write(format);
+        bufferedWriter.newLine();
+    }
+
+    private static void writeYear(BufferedWriter bufferedWriter,
+            DataWrapper dataWrapper) throws IOException {
+        String year = dataWrapper.getYear();
+        bufferedWriter.write(year);
+        bufferedWriter.newLine();
     }
 
     private static void validateFolderToScan(File folderToScan) {
@@ -104,7 +154,7 @@ public class Main {
         }
     }
 
-    private static List<File> filterList(File[] listFiles) {
+    private static List<File> filterFiles(File[] listFiles) {
         List<File> asList = Arrays.asList(listFiles);
         Predicate<? super File> predicate = file -> {
             if (file.isDirectory()
