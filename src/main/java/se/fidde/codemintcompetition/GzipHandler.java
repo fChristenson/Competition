@@ -1,15 +1,22 @@
 package se.fidde.codemintcompetition;
 
+import java.io.BufferedReader;
 import java.io.File;
+import java.io.FileInputStream;
+import java.io.IOException;
+import java.io.InputStreamReader;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ForkJoinTask;
 import java.util.concurrent.RecursiveTask;
+import java.util.zip.GZIPInputStream;
 
-public class GzipHandler extends RecursiveTask<Collection<String>> {
+public class GzipHandler extends RecursiveTask<Collection<DataWrapper>> {
 
+    private static final long serialVersionUID = 1L;
     private List<File> files;
 
     public GzipHandler(List<File> gzipFiles) {
@@ -18,9 +25,15 @@ public class GzipHandler extends RecursiveTask<Collection<String>> {
     }
 
     @Override
-    protected Collection<String> compute() {
+    protected Collection<DataWrapper> compute() {
         if (files.size() == 1)
-            return getData(files);
+            try {
+                return getData(files);
+
+            } catch (IOException e1) {
+                e1.printStackTrace();
+                return Collections.emptyList();
+            }
 
         int mid = files.size() / 2;
         int end = files.size();
@@ -31,12 +44,12 @@ public class GzipHandler extends RecursiveTask<Collection<String>> {
         List<File> gzipFiles2 = files.subList(mid, end);
         GzipHandler gzipHandler2 = new GzipHandler(gzipFiles2);
 
-        ForkJoinTask<Collection<String>> fork = gzipHandler.fork();
-        ForkJoinTask<Collection<String>> fork2 = gzipHandler2.fork();
+        ForkJoinTask<Collection<DataWrapper>> fork = gzipHandler.fork();
+        ForkJoinTask<Collection<DataWrapper>> fork2 = gzipHandler2.fork();
 
         try {
-            Collection<String> collection = fork.get();
-            Collection<String> collection2 = fork2.get();
+            Collection<DataWrapper> collection = fork.get();
+            Collection<DataWrapper> collection2 = fork2.get();
             collection.addAll(collection2);
 
             return collection;
@@ -47,9 +60,31 @@ public class GzipHandler extends RecursiveTask<Collection<String>> {
         }
     }
 
-    private Collection<String> getData(List<File> files) {
+    private Collection<DataWrapper> getData(List<File> files)
+            throws IOException {
 
-        return null;
+        File file = files.get(0);
+        FileInputStream fileInputStream = new FileInputStream(file);
+        GZIPInputStream gzipIs = new GZIPInputStream(fileInputStream);
+        InputStreamReader inputStreamReader = new InputStreamReader(gzipIs);
+        BufferedReader bufferedReader = new BufferedReader(inputStreamReader);
+
+        Collection<DataWrapper> result = new ArrayList<>();
+        String line = bufferedReader.readLine();
+
+        while (line != null) {
+            String year = line.substring(0, 4);
+            String temperatureString = line.substring(13, 19);
+
+            temperatureString = temperatureString.trim();
+            double temperature = Double.valueOf(temperatureString) / 10;
+
+            DataWrapper dataWrapper = new DataWrapper(year, temperature);
+
+            result.add(dataWrapper);
+            line = bufferedReader.readLine();
+        }
+        bufferedReader.close();
+        return result;
     }
-
 }

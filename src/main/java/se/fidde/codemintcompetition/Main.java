@@ -20,11 +20,11 @@ public class Main {
         List<File> folders = getFolders(folderToScan);
 
         ForkJoinPool forkJoinPool = new ForkJoinPool();
-        FolderHandler gzipHandler = new FolderHandler(folders);
+        FolderHandler folderHandler = new FolderHandler(folders);
 
         System.out.println("Processing...");
         ForkJoinTask<Collection<String>> submit = forkJoinPool
-                .submit(gzipHandler);
+                .submit(folderHandler);
 
         try {
             Collection<String> join = submit.join();
@@ -61,8 +61,7 @@ public class Main {
     }
 
     private static void writeDataToFile(Collection<String> join) {
-        // TODO Auto-generated method stub
-
+        System.out.println(join.size());
     }
 
     private static void validateFolderToScan(File folderToScan) {

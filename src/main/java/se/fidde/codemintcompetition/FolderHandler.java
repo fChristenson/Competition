@@ -14,6 +14,7 @@ import java.util.stream.Collectors;
 
 public class FolderHandler extends RecursiveTask<Collection<String>> {
 
+    private static final long serialVersionUID = 1L;
     private List<File> foldersWithGzipFiles;
 
     public FolderHandler(List<File> folders) {
@@ -69,10 +70,31 @@ public class FolderHandler extends RecursiveTask<Collection<String>> {
         GzipHandler gzipHandler = new GzipHandler(gzipFiles);
 
         ForkJoinPool forkJoinPool = new ForkJoinPool();
-        ForkJoinTask<Collection<String>> submit = forkJoinPool
+        ForkJoinTask<Collection<DataWrapper>> submit = forkJoinPool
                 .submit(gzipHandler);
 
-        return submit.get();
+        Collection<DataWrapper> collection = submit.get();
+        return filterData(collection);
+    }
+
+    private Collection<String> filterData(Collection<DataWrapper> collection) {
+        Predicate<? super DataWrapper> predicate = data -> {
+            String year = data.getYear();
+            double temperature = data.getTemperature();
+
+            if (year.equals("-9999"))
+                return false;
+
+            else if (temperature < -100.0 || temperature > 100.0
+                    || temperature == -9999)
+
+                return false;
+
+            return true;
+        };
+
+        collection.stream().filter(predicate).collect(Collectors.toList());
+        return null;
     }
 
     private List<File> filterList(File[] listFiles) {
