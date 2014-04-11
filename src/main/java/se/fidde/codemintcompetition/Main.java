@@ -16,12 +16,22 @@ public class Main {
 
     public static void main(String[] args) {
         validateInputArgs(args);
-
-        File folderToScan = new File(args[0]);
-        validateFolderToScan(folderToScan);
+        File folderToScan = getFolderToScan(args);
 
         System.out.println("Processing...");
 
+        Collection<DataWrapper> result = process(folderToScan);
+        try {
+            writeDataToFile(result, args[1]);
+            System.out.println("Processing done.");
+
+        } catch (Exception e) {
+            e.printStackTrace();
+            System.exit(0);
+        }
+    }
+
+    private static Collection<DataWrapper> process(File folderToScan) {
         List<File> folders = getSubFolders(folderToScan);
         ForkJoinPool pool = new ForkJoinPool();
         Collection<DataWrapper> result = new ArrayList<DataWrapper>();
@@ -36,17 +46,13 @@ public class Main {
             // TODO: use filters to get only the relevant entry
             result.add(dataFromFolder);
         });
+        return result;
+    }
 
-        try {
-            writeDataToFile(result, args[1]);
-
-            System.out.println("Processing done.");
-            System.out.println("Shutting down.");
-
-        } catch (Exception e) {
-            e.printStackTrace();
-            System.exit(0);
-        }
+    private static File getFolderToScan(String[] args) {
+        File folderToScan = new File(args[0]);
+        validateFolderToScan(folderToScan);
+        return folderToScan;
     }
 
     private static List<File> getSubFolders(File folderToScan) {

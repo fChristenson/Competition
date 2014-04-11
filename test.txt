@@ -1,4 +1,4 @@
 1901
 Min temp: -25.0 Celcius
-Avg temp: 3,0 Celcius
+Avg temp: 30,5 Celcius
 Max temp: 23.9 Celcius

@@ -14,9 +14,8 @@ public class DataWrapper {
     private String year;
     private Collection<Double> tempCollection;
 
-    public DataWrapper(String year) {
+    public DataWrapper() {
         super();
-        this.year = year;
         tempCollection = new ArrayList<Double>();
     }
 
@@ -30,7 +29,7 @@ public class DataWrapper {
 
         DecimalFormat decimalFormat = new DecimalFormat("0.0");
 
-        return decimalFormat.format(avg.getAsDouble());
+        return decimalFormat.format(avg.getAsDouble() / 10);
     }
 
     public String getMinTemperature() {
@@ -38,7 +37,8 @@ public class DataWrapper {
         Optional<Double> min = tempCollection.parallelStream().collect(
                 Collectors.minBy(comparator));
 
-        return min.get().toString();
+        double result = min.get().doubleValue() / 10;
+        return String.valueOf(result);
     }
 
     private Comparator<Double> getDoubleComparator() {
@@ -62,7 +62,8 @@ public class DataWrapper {
         Optional<Double> max = tempCollection.parallelStream().collect(
                 Collectors.maxBy(comparator));
 
-        return max.get().toString();
+        double result = max.get().doubleValue() / 10;
+        return String.valueOf(result);
     }
 
     public String getYear() {
@@ -83,7 +84,7 @@ public class DataWrapper {
     }
 
     public static DataWrapper getEmptyWrapper() {
-        return new DataWrapper("0");
+        return new DataWrapper();
     }
 
     @Override

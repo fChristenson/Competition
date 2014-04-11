@@ -15,6 +15,7 @@ public class GzipHandler extends RecursiveTask<DataWrapper> {
 
     private static final long serialVersionUID = 1L;
     private List<File> files;
+    private String year;
 
     public GzipHandler(List<File> gzipFiles) {
         super();
@@ -60,7 +61,6 @@ public class GzipHandler extends RecursiveTask<DataWrapper> {
     }
 
     private DataWrapper getData(List<File> files) throws IOException {
-
         File file = files.get(0);
         FileInputStream fileInputStream = new FileInputStream(file);
         GZIPInputStream gzipIs = new GZIPInputStream(fileInputStream);
@@ -69,27 +69,31 @@ public class GzipHandler extends RecursiveTask<DataWrapper> {
 
         String line = bufferedReader.readLine();
 
-        String year = getYear(line);
-        DataWrapper dataWrapper = new DataWrapper(year);
+        DataWrapper dataWrapper = new DataWrapper();
 
         while (line != null) {
-            String temperatureString = line.substring(13, 19);
-
-            temperatureString = temperatureString.trim();
-            double temperature = Double.valueOf(temperatureString) / 10;
-
-            dataWrapper.getTemperatureCollection().add(temperature);
+            getYear(line);
+            getTemperature(line, dataWrapper);
             line = bufferedReader.readLine();
         }
         bufferedReader.close();
+
+        dataWrapper.setYear(year);
         return dataWrapper;
     }
 
-    private String getYear(String line) {
-        if (line != null) {
-            String year = line.substring(0, 4);
-            return year;
+    private void getTemperature(String line, DataWrapper dataWrapper) {
+        String temperatureString = line.substring(13, 19);
+
+        temperatureString = temperatureString.trim();
+        double temperature = Double.valueOf(temperatureString);
+
+        dataWrapper.getTemperatureCollection().add(temperature);
+    }
+
+    private void getYear(String line) {
+        if (line != null && !line.equals("-9999") && year == null) {
+            year = line.substring(0, 4);
         }
-        return null;
     }
 }
