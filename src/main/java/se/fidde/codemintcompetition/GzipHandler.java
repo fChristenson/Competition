@@ -5,17 +5,18 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStreamReader;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ForkJoinTask;
 import java.util.concurrent.RecursiveTask;
 import java.util.zip.GZIPInputStream;
 
-public class GzipHandler extends RecursiveTask<DataWrapper> {
+public class GzipHandler extends RecursiveTask<List<ProcessedPost>> {
 
     private static final long serialVersionUID = 1L;
     private List<File> files;
-    private String year;
 
     public GzipHandler(List<File> gzipFiles) {
         super();
@@ -23,15 +24,17 @@ public class GzipHandler extends RecursiveTask<DataWrapper> {
     }
 
     @Override
-    protected DataWrapper compute() {
+    protected List<ProcessedPost> compute() {
         if (files.size() <= 1)
             try {
-                return getData(files);
+                ProcessedPost postData = getPostData(files);
+                List<ProcessedPost> result = new ArrayList<>();
+                result.add(postData);
+                return result;
 
             } catch (IOException e1) {
                 e1.printStackTrace();
-                return DataWrapper.getEmptyWrapper();
-
+                return Collections.emptyList();
             }
 
         int mid = files.size() / 2;
@@ -43,24 +46,24 @@ public class GzipHandler extends RecursiveTask<DataWrapper> {
         List<File> gzipFiles2 = files.subList(mid, end);
         GzipHandler gzipHandler2 = new GzipHandler(gzipFiles2);
 
-        ForkJoinTask<DataWrapper> fork = gzipHandler.fork();
-        ForkJoinTask<DataWrapper> fork2 = gzipHandler2.fork();
+        ForkJoinTask<List<ProcessedPost>> fork = gzipHandler.fork();
+        ForkJoinTask<List<ProcessedPost>> fork2 = gzipHandler2.fork();
 
         try {
-            DataWrapper wrapper = fork.get();
-            DataWrapper wrapper2 = fork2.get();
-            wrapper.getTemperatureCollection().addAll(
-                    wrapper2.getTemperatureCollection());
+            List<ProcessedPost> list = fork.get();
+            List<ProcessedPost> list2 = fork2.get();
+            list.addAll(list2);
 
-            return wrapper;
+            return list;
 
         } catch (InterruptedException | ExecutionException e) {
             e.printStackTrace();
-            return DataWrapper.getEmptyWrapper();
+            return Collections.emptyList();
         }
     }
 
-    private DataWrapper getData(List<File> files) throws IOException {
+    private ProcessedPost getPostData(List<File> files) throws IOException {
+
         File file = files.get(0);
         FileInputStream fileInputStream = new FileInputStream(file);
         GZIPInputStream gzipIs = new GZIPInputStream(fileInputStream);
@@ -69,31 +72,46 @@ public class GzipHandler extends RecursiveTask<DataWrapper> {
 
         String line = bufferedReader.readLine();
 
-        DataWrapper dataWrapper = new DataWrapper();
+        List<ISDRow> rows = new ArrayList<ISDRow>();
 
         while (line != null) {
-            getYear(line);
-            getTemperature(line, dataWrapper);
+            String year = line.substring(0, 4);
+
+            String temperatureString = line.substring(13, 19);
+            temperatureString = temperatureString.trim();
+            int temp = Integer.valueOf(temperatureString);
+
+            if (!isValidData(year, temperatureString)) {
+                bufferedReader.close();
+                return new ProcessedPost(file.getName());
+            }
+
+            ISDRow row = new ISDRow(year, temp);
+            rows.add(row);
+
             line = bufferedReader.readLine();
         }
         bufferedReader.close();
-
-        dataWrapper.setYear(year);
-        return dataWrapper;
+        return new ProcessedPost(file.getName(), rows);
     }
 
-    private void getTemperature(String line, DataWrapper dataWrapper) {
-        String temperatureString = line.substring(13, 19);
+    private boolean isValidData(String year, String temperatureString) {
+        String invalidData = "-9999";
+        boolean isInvalidYear = year.equals(invalidData);
+        boolean isInvalidTempFormat = temperatureString.equals(invalidData);
+        int temp;
+        try {
+            temp = Integer.valueOf(temperatureString);
+            temp = temp / 10;
 
-        temperatureString = temperatureString.trim();
-        double temperature = Double.valueOf(temperatureString);
-
-        dataWrapper.getTemperatureCollection().add(temperature);
-    }
-
-    private void getYear(String line) {
-        if (line != null && !line.equals("-9999") && year == null) {
-            year = line.substring(0, 4);
+        } catch (NumberFormatException e) {
+            return false;
         }
+        boolean isValidTemp = (temp > -100 && temp < 100) ? true : false;
+
+        if (!isInvalidYear && !isInvalidTempFormat && isValidTemp)
+            return true;
+
+        return false;
     }
 }

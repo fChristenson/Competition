@@ -4,9 +4,7 @@ import java.io.BufferedWriter;
 import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
-import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collection;
 import java.util.List;
 import java.util.concurrent.ForkJoinPool;
 import java.util.function.Predicate;
@@ -20,33 +18,31 @@ public class Main {
 
         System.out.println("Processing...");
 
-        Collection<DataWrapper> result = process(folderToScan);
-        try {
-            writeDataToFile(result, args[1]);
-            System.out.println("Processing done.");
+        process(folderToScan, args[1]);
 
-        } catch (Exception e) {
-            e.printStackTrace();
-            System.exit(0);
-        }
+        System.out.println("Done.");
     }
 
-    private static Collection<DataWrapper> process(File folderToScan) {
+    private static void process(File folderToScan, String outputFile) {
         List<File> folders = getSubFolders(folderToScan);
         ForkJoinPool pool = new ForkJoinPool();
-        Collection<DataWrapper> result = new ArrayList<DataWrapper>();
 
         folders.forEach(file -> {
             File[] listFiles = file.listFiles();
             List<File> filterList = filterFiles(listFiles);
 
             GzipHandler gzipHandler = new GzipHandler(filterList);
-            DataWrapper dataFromFolder = pool.invoke(gzipHandler);
+            List<ProcessedPost> dataFromFolder = pool.invoke(gzipHandler);
 
-            // TODO: use filters to get only the relevant entry
-            result.add(dataFromFolder);
+            writeDataToFile(dataFromFolder, outputFile);
         });
-        return result;
+    }
+
+    private static void filterData(List<ProcessedPost> dataFromFolder) {
+        Predicate<? super ProcessedPost> filter = post -> {
+            return post.getRows() == null || post.getRows().size() == 0;
+        };
+        dataFromFolder.removeIf(filter);
     }
 
     private static File getFolderToScan(String[] args) {
@@ -76,69 +72,56 @@ public class Main {
         return result;
     }
 
-    private static void writeDataToFile(Collection<DataWrapper> result,
-            String fileName) throws IOException {
+    private static void writeDataToFile(List<ProcessedPost> dataFromFolder,
+            String fileName) {
+
+        filterData(dataFromFolder);
+        if (dataFromFolder.size() == 0)
+            return;
+
         File file = new File(fileName);
-        FileWriter fileWriter = new FileWriter(file);
-        BufferedWriter bufferedWriter = new BufferedWriter(fileWriter);
+        FileWriter fileWriter = null;
+        BufferedWriter bufferedWriter = null;
 
-        result.forEach(dataWrapper -> {
-            try {
-                writeYear(bufferedWriter, dataWrapper);
-                writeMinTemperature(bufferedWriter, dataWrapper);
-                writeAvgTemperature(bufferedWriter, dataWrapper);
-                writeMaxTemperature(bufferedWriter, dataWrapper);
+        try {
+            fileWriter = new FileWriter(file, true);
+            bufferedWriter = new BufferedWriter(fileWriter);
+            String valueString = getValues(dataFromFolder);
 
-            } catch (Exception e) {
-                e.printStackTrace();
+            bufferedWriter.write(valueString);
+            bufferedWriter.newLine();
 
-            } finally {
+        } catch (Exception e) {
+            e.printStackTrace();
+
+        } finally {
+            if (bufferedWriter != null)
                 try {
                     bufferedWriter.close();
-                    fileWriter.close();
-
-                } catch (Exception e) {
+                } catch (IOException e) {
                     e.printStackTrace();
                 }
-            }
-        });
+        }
     }
 
-    private static void writeMaxTemperature(BufferedWriter bufferedWriter,
-            DataWrapper dataWrapper) throws IOException {
+    private static String getValues(List<ProcessedPost> dataFromFolder) {
+        String year = dataFromFolder.get(0).getRows().get(0).getYear();
+        int max = dataFromFolder.parallelStream()
+                .mapToInt(post -> post.getMaxTemp()).sum();
 
-        String maxTemperature = dataWrapper.getMaxTemperature();
-        String format = String.format("Max temp: %s Celcius", maxTemperature);
+        int avg = dataFromFolder.parallelStream()
+                .mapToInt(post -> post.getAvgTemp()).sum();
 
-        bufferedWriter.write(format);
-        bufferedWriter.newLine();
-    }
+        int min = dataFromFolder.parallelStream()
+                .mapToInt(post -> post.getMinTemp()).sum();
 
-    private static void writeMinTemperature(BufferedWriter bufferedWriter,
-            DataWrapper dataWrapper) throws IOException {
+        int length = dataFromFolder.size();
+        max = max / length;
+        avg = avg / length;
+        min = min / length;
 
-        String minTemperature = dataWrapper.getMinTemperature();
-        String format = String.format("Min temp: %s Celcius", minTemperature);
-
-        bufferedWriter.write(format);
-        bufferedWriter.newLine();
-    }
-
-    private static void writeAvgTemperature(BufferedWriter bufferedWriter,
-            DataWrapper dataWrapper) throws IOException {
-
-        String avgTemperature = dataWrapper.getAvgTemperature();
-        String format = String.format("Avg temp: %s Celcius", avgTemperature);
-
-        bufferedWriter.write(format);
-        bufferedWriter.newLine();
-    }
-
-    private static void writeYear(BufferedWriter bufferedWriter,
-            DataWrapper dataWrapper) throws IOException {
-        String year = dataWrapper.getYear();
-        bufferedWriter.write(year);
-        bufferedWriter.newLine();
+        String format = String.format("%s;%s;%s;%s", year, max, avg, min);
+        return format;
     }
 
     private static void validateFolderToScan(File folderToScan) {
