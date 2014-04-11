@@ -1,9 +1,12 @@
 package se.fidde.codemintcompetition;
 
+import java.text.DecimalFormat;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Comparator;
+import java.util.Optional;
+import java.util.OptionalDouble;
 import java.util.function.ToDoubleFunction;
-import java.util.stream.Collector;
 import java.util.stream.Collectors;
 
 public class DataWrapper {
@@ -17,28 +20,49 @@ public class DataWrapper {
         tempCollection = new ArrayList<Double>();
     }
 
-    public double getAvgTemperature() {
+    public String getAvgTemperature() {
         ToDoubleFunction<Double> mapper = temp -> {
             return temp.doubleValue();
         };
 
-        Collector<Double, ?, Double> avgDouble = Collectors
-                .averagingDouble(mapper);
-        Double avg = tempCollection.parallelStream().collect(avgDouble);
+        OptionalDouble avg = tempCollection.parallelStream()
+                .mapToDouble(mapper).average();
 
-        return avg.doubleValue();
+        DecimalFormat decimalFormat = new DecimalFormat("0.0");
+
+        return decimalFormat.format(avg.getAsDouble());
     }
 
-    public double getMinTemperature() {
-        // TODO: implement
+    public String getMinTemperature() {
+        Comparator<Double> comparator = getDoubleComparator();
+        Optional<Double> min = tempCollection.parallelStream().collect(
+                Collectors.minBy(comparator));
 
-        return 0;
+        return min.get().toString();
     }
 
-    public double getMaxTemperature() {
-        // TODO: implement
+    private Comparator<Double> getDoubleComparator() {
+        Comparator<Double> comparator = (double1, double2) -> {
+            double doubleValue = double1.doubleValue();
+            double doubleValue2 = double2.doubleValue();
 
-        return 0;
+            if (doubleValue == doubleValue2)
+                return 0;
+
+            else if (doubleValue < doubleValue2)
+                return -1;
+
+            return 1;
+        };
+        return comparator;
+    }
+
+    public String getMaxTemperature() {
+        Comparator<Double> comparator = getDoubleComparator();
+        Optional<Double> max = tempCollection.parallelStream().collect(
+                Collectors.maxBy(comparator));
+
+        return max.get().toString();
     }
 
     public String getYear() {

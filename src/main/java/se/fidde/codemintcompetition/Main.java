@@ -101,7 +101,7 @@ public class Main {
     private static void writeMaxTemperature(BufferedWriter bufferedWriter,
             DataWrapper dataWrapper) throws IOException {
 
-        double maxTemperature = dataWrapper.getMaxTemperature();
+        String maxTemperature = dataWrapper.getMaxTemperature();
         String format = String.format("Max temp: %s Celcius", maxTemperature);
 
         bufferedWriter.write(format);
@@ -111,7 +111,7 @@ public class Main {
     private static void writeMinTemperature(BufferedWriter bufferedWriter,
             DataWrapper dataWrapper) throws IOException {
 
-        double minTemperature = dataWrapper.getMinTemperature();
+        String minTemperature = dataWrapper.getMinTemperature();
         String format = String.format("Min temp: %s Celcius", minTemperature);
 
         bufferedWriter.write(format);
@@ -121,7 +121,7 @@ public class Main {
     private static void writeAvgTemperature(BufferedWriter bufferedWriter,
             DataWrapper dataWrapper) throws IOException {
 
-        double avgTemperature = dataWrapper.getAvgTemperature();
+        String avgTemperature = dataWrapper.getAvgTemperature();
         String format = String.format("Avg temp: %s Celcius", avgTemperature);
 
         bufferedWriter.write(format);
