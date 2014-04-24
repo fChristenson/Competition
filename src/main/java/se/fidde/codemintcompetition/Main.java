@@ -1,31 +1,31 @@
 package se.fidde.codemintcompetition;
 
-import java.io.BufferedReader;
+import java.io.BufferedWriter;
 import java.io.File;
-import java.io.FileInputStream;
+import java.io.FileWriter;
 import java.io.IOException;
-import java.io.InputStreamReader;
 import java.net.URISyntaxException;
 import java.nio.file.FileVisitOption;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.attribute.BasicFileAttributes;
-import java.util.Arrays;
+import java.util.Comparator;
 import java.util.IntSummaryStatistics;
 import java.util.List;
 import java.util.function.BiPredicate;
+import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.Predicate;
-import java.util.function.ToIntFunction;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
-import java.util.zip.GZIPInputStream;
 
 public class Main {
 
     private static File errorOutputFile;
     private static File outputFile;
     private static File rootFolder;
+    private static FileWriter fWriter;
+    private static BufferedWriter bufferedWriter;
     private static FileVisitOption options;
     private static BiPredicate<Path, BasicFileAttributes> folder;
     private static Path start;
@@ -53,19 +53,14 @@ public class Main {
     }
 
     private static void process() throws IOException, URISyntaxException {
-
         validateFolderToScan();
 
         start = rootFolder.toPath();
         folder = getCorrectFolders();
         options = FileVisitOption.FOLLOW_LINKS;
+
         Function<Path, PostStatistics> dataPerFolder = getDataForEachFolder();
-
-        List<PostStatistics> data = Files.find(start, 1, folder, options)
-                .parallel().map(dataPerFolder).collect(Collectors.toList());
-
-        // TODO: format data to strings and sort
-        System.out.println(data);
+        writeResultsToFile(dataPerFolder);
     }
 
     private static BiPredicate<Path, BasicFileAttributes> getCorrectFolders() {
@@ -78,7 +73,9 @@ public class Main {
     private static Function<Path, PostStatistics> getDataForEachFolder() {
         return path -> {
             File file = path.toFile();
-            List<IntSummaryStatistics> summaryStatistics = getDataForEachGzipFile(file);
+            List<IntSummaryStatistics> summaryStatistics = IsdFileReader
+                    .getDataForEachGzipFile(file);
+
             IntSummaryStatistics statistics = getSumOfAllData(summaryStatistics);
             String year = path.getFileName().toString();
 
@@ -86,17 +83,62 @@ public class Main {
         };
     }
 
-    private static List<IntSummaryStatistics> getDataForEachGzipFile(File file) {
-        File[] listFiles = file.listFiles();
-        List<File> files = Arrays.asList(listFiles);
-        Predicate<? super File> gzFilter = f -> Pattern.matches(".+\\.gz",
-                f.getName());
+    private static void writeResultsToFile(
+            Function<Path, PostStatistics> dataPerFolder) throws IOException {
 
-        Function<File, IntSummaryStatistics> mapper = getDataFromFile();
+        List<PostStatistics> data = Files.find(start, 1, folder, options)
+                .parallel().map(dataPerFolder).collect(Collectors.toList());
 
-        List<IntSummaryStatistics> dataFromFiles = files.parallelStream()
-                .filter(gzFilter).map(mapper).collect(Collectors.toList());
-        return dataFromFiles;
+        Comparator<? super PostStatistics> comparator = getComparator();
+        Consumer<? super PostStatistics> writeToFile = writeToOutputFile();
+
+        fWriter = new FileWriter(outputFile);
+        bufferedWriter = new BufferedWriter(fWriter);
+
+        data.stream().sorted(comparator).forEach(writeToFile);
+        bufferedWriter.close();
+    }
+
+    private static Consumer<? super PostStatistics> writeToOutputFile()
+            throws IOException {
+
+        return ps -> {
+            try {
+                StringBuilder builder = getFormatedString(ps);
+                bufferedWriter.write(builder.toString());
+                bufferedWriter.newLine();
+
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        };
+    }
+
+    private static StringBuilder getFormatedString(PostStatistics ps) {
+        StringBuilder builder = new StringBuilder();
+        builder.append(ps.getYear()).append(";");
+        builder.append(ps.getStatistics().getMax()).append(";");
+
+        double average = ps.getStatistics().getAverage();
+        builder.append((int) Math.round(average)).append(";");
+
+        builder.append(ps.getStatistics().getMin()).append(";");
+        return builder;
+    }
+
+    private static Comparator<? super PostStatistics> getComparator() {
+        return (ps1, ps2) -> {
+            int year = Integer.valueOf(ps1.getYear());
+            int year2 = Integer.valueOf(ps2.getYear());
+
+            if (year < year2)
+                return -1;
+
+            else if (year > year2)
+                return 1;
+
+            return 0;
+        };
     }
 
     private static IntSummaryStatistics getSumOfAllData(
@@ -110,30 +152,8 @@ public class Main {
         return result;
     }
 
-    private static Function<File, IntSummaryStatistics> getDataFromFile() {
-        return file -> {
-            try {
-                FileInputStream fs = new FileInputStream(file);
-                GZIPInputStream gzs = new GZIPInputStream(fs);
-                InputStreamReader isr = new InputStreamReader(gzs);
-                BufferedReader br = new BufferedReader(isr);
-
-                ToIntFunction<? super String> mapper = string -> {
-                    String tempString = string.substring(14, 20).trim();
-                    return Integer.valueOf(tempString);
-                };
-
-                return br.lines().parallel().mapToInt(mapper)
-                        .summaryStatistics();
-
-            } catch (Exception e) {
-                e.printStackTrace();
-                return new IntSummaryStatistics();
-            }
-
-        };
-    }
-
+    // TODO: add check for invalid data and if erroroutput is defined print
+    // invalid posts
     private static Predicate<String> getRowFilter() {
         return string -> {
             String errorString = "-9999";
