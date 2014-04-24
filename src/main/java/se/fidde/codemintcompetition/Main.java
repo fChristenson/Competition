@@ -25,42 +25,59 @@ public class Main {
     private static File outputFile;
     private static File rootFolder;
     private static FileWriter fWriter;
-    private static BufferedWriter bufferedWriter;
+    private static BufferedWriter bWriter;
     private static FileVisitOption options;
-    private static BiPredicate<Path, BasicFileAttributes> folder;
-    private static Path start;
+    private static BiPredicate<Path, BasicFileAttributes> correctFolders;
+    private static Path startFolderForSearch;
 
-    public static void main(String[] args) throws IOException {
-        validateInputArgs(args);
+    public static void main(String[] args) throws IOException,
+            URISyntaxException {
+
         instanciateParamFiles(args);
 
         System.out.println("Processing...");
-
-        try {
-            process();
-        } catch (URISyntaxException e) {
-            e.printStackTrace();
-        }
-
+        process();
         System.out.println("Done.");
     }
 
     private static void instanciateParamFiles(String[] args) {
+        validateInputArgs(args);
+
         rootFolder = new File(args[0]);
         outputFile = new File(args[1]);
         if (args.length == 3)
             errorOutputFile = new File(args[2]);
     }
 
+    private static void validateInputArgs(String[] args) {
+        if (args.length > 3 || args.length < 2) {
+            System.out.println("Invalid arguments format");
+            System.out
+                    .println("Please use: <folder to scan> <outputfile> <optional:invalid posts outputfile>");
+            System.exit(0);
+        }
+    }
+
     private static void process() throws IOException, URISyntaxException {
         validateFolderToScan();
 
-        start = rootFolder.toPath();
-        folder = getCorrectFolders();
+        startFolderForSearch = rootFolder.toPath();
+        correctFolders = getCorrectFolders();
         options = FileVisitOption.FOLLOW_LINKS;
 
         Function<Path, PostStatistics> dataPerFolder = getDataForEachFolder();
         writeResultsToFile(dataPerFolder);
+    }
+
+    private static void validateFolderToScan() {
+        if (!rootFolder.exists() || !rootFolder.isDirectory()
+                || !rootFolder.canRead()) {
+    
+            System.out.println("Provided folder is not valid");
+            System.out
+                    .println("Please make sure that the path is correct and you have read/write access");
+            System.exit(0);
+        }
     }
 
     private static BiPredicate<Path, BasicFileAttributes> getCorrectFolders() {
@@ -86,17 +103,18 @@ public class Main {
     private static void writeResultsToFile(
             Function<Path, PostStatistics> dataPerFolder) throws IOException {
 
-        List<PostStatistics> data = Files.find(start, 1, folder, options)
+        List<PostStatistics> data = Files
+                .find(startFolderForSearch, 1, correctFolders, options)
                 .parallel().map(dataPerFolder).collect(Collectors.toList());
 
         Comparator<? super PostStatistics> comparator = getComparator();
         Consumer<? super PostStatistics> writeToFile = writeToOutputFile();
 
         fWriter = new FileWriter(outputFile);
-        bufferedWriter = new BufferedWriter(fWriter);
+        bWriter = new BufferedWriter(fWriter);
 
         data.stream().sorted(comparator).forEach(writeToFile);
-        bufferedWriter.close();
+        bWriter.close();
     }
 
     private static Consumer<? super PostStatistics> writeToOutputFile()
@@ -105,8 +123,8 @@ public class Main {
         return ps -> {
             try {
                 StringBuilder builder = getFormatedString(ps);
-                bufferedWriter.write(builder.toString());
-                bufferedWriter.newLine();
+                bWriter.write(builder.toString());
+                bWriter.newLine();
 
             } catch (Exception e) {
                 e.printStackTrace();
@@ -167,25 +185,5 @@ public class Main {
 
             return yearInValid || tempInValid || !tempInRange;
         };
-    }
-
-    private static void validateFolderToScan() {
-        if (!rootFolder.exists() || !rootFolder.isDirectory()
-                || !rootFolder.canRead()) {
-
-            System.out.println("Provided folder is not valid");
-            System.out
-                    .println("Please make sure that the path is correct and you have read/write access");
-            System.exit(0);
-        }
-    }
-
-    private static void validateInputArgs(String[] args) {
-        if (args.length > 3 || args.length < 2) {
-            System.out.println("Invalid arguments format");
-            System.out
-                    .println("Please use: <folder to scan> <outputfile> <optional:invalid posts outputfile>");
-            System.exit(0);
-        }
     }
 }
