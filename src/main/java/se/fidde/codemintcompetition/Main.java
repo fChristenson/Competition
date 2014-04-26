@@ -18,6 +18,13 @@ import java.util.function.Function;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
+/**
+ * Application entrypoint, assumes each folder is named by year and that each
+ * gzip file is 1 folder down from the root.
+ * 
+ * @author Fidde
+ *
+ */
 public class Main {
 
     private static File errorOutputFile;
@@ -114,6 +121,7 @@ public class Main {
 
     private static void writeResultsToFile() throws IOException {
         Function<Path, PostStatistics> dataPerFolder = getDataForEachFolder();
+
         List<PostStatistics> data = Files
                 .find(startFolderForSearch, 1, correctFolders, options)
                 .parallel().map(dataPerFolder).collect(Collectors.toList());
@@ -145,6 +153,9 @@ public class Main {
 
     private static Consumer<? super PostStatistics> writeToOutputFile()
             throws IOException {
+
+        // in the event that a year has a single corrupt post we don´t add it to
+        // the output file
 
         return ps -> {
             if (ps.getStatistics().getCount() < 1)

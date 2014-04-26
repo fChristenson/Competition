@@ -2,6 +2,12 @@ package se.fidde.codemintcompetition;
 
 import java.util.IntSummaryStatistics;
 
+/**
+ * Pojo to hold data from each folder.
+ * 
+ * @author Fidde
+ *
+ */
 public class PostStatistics {
     private String year;
     private IntSummaryStatistics statistics;

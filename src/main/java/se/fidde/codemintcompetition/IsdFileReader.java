@@ -16,6 +16,13 @@ import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import java.util.zip.GZIPInputStream;
 
+/**
+ * Static helper class for getting data from gzip files and writing out errors
+ * to file.
+ * 
+ * @author Fidde
+ *
+ */
 public class IsdFileReader {
 
     private static File errorOutputFile;
@@ -26,6 +33,15 @@ public class IsdFileReader {
         errorOutputFile = file;
     }
 
+    /**
+     * Takes a root folder containing ISD-lite formated gzip files and retrives
+     * a list of {@link java.util.IntSummaryStatistics}. The data is retrieved
+     * using parallel streams.
+     * 
+     * @param folder
+     *            folder with ISD-lite gzip files
+     * @return list of IntSummaryStatistics
+     */
     public static List<IntSummaryStatistics> getDataForEachGzipFile(File folder) {
         File[] listFiles = folder.listFiles();
         List<File> files = Arrays.asList(listFiles);
@@ -66,6 +82,14 @@ public class IsdFileReader {
                     } catch (Exception e) {
                         if (errorOutputFile != null) {
                             writeErrorToFile(file);
+
+                            /*
+                             * Could´nt find a way to stop iteration while using
+                             * streams so i set a flag and if an error occurs i
+                             * return an empty IntSummaryStatistics object. Once
+                             * all the data is gathered i filter out the empty
+                             * objects.
+                             */
                             lastFileLogged = file;
                         }
                         errorFlag = true;
@@ -99,6 +123,8 @@ public class IsdFileReader {
     }
 
     private static void writeErrorToFile(File file) {
+        // since iteration can´t stop i make sure only new file errors are
+        // written to file
         if (file == lastFileLogged)
             return;
 
