@@ -15,7 +15,6 @@ import java.util.List;
 import java.util.function.BiPredicate;
 import java.util.function.Consumer;
 import java.util.function.Function;
-import java.util.function.Predicate;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
@@ -65,14 +64,13 @@ public class Main {
         correctFolders = getCorrectFolders();
         options = FileVisitOption.FOLLOW_LINKS;
 
-        Function<Path, PostStatistics> dataPerFolder = getDataForEachFolder();
-        writeResultsToFile(dataPerFolder);
+        writeResultsToFile();
     }
 
     private static void validateFolderToScan() {
         if (!rootFolder.exists() || !rootFolder.isDirectory()
                 || !rootFolder.canRead()) {
-    
+
             System.out.println("Provided folder is not valid");
             System.out
                     .println("Please make sure that the path is correct and you have read/write access");
@@ -90,6 +88,9 @@ public class Main {
     private static Function<Path, PostStatistics> getDataForEachFolder() {
         return path -> {
             File file = path.toFile();
+            if (errorOutputFile != null)
+                IsdFileReader.setErrorOutputFile(errorOutputFile);
+
             List<IntSummaryStatistics> summaryStatistics = IsdFileReader
                     .getDataForEachGzipFile(file);
 
@@ -100,9 +101,19 @@ public class Main {
         };
     }
 
-    private static void writeResultsToFile(
-            Function<Path, PostStatistics> dataPerFolder) throws IOException {
+    private static IntSummaryStatistics getSumOfAllData(
+            List<IntSummaryStatistics> summaryStatistics) {
 
+        IntSummaryStatistics result = new IntSummaryStatistics();
+        summaryStatistics.parallelStream().forEach(sumary -> {
+            result.combine(sumary);
+        });
+
+        return result;
+    }
+
+    private static void writeResultsToFile() throws IOException {
+        Function<Path, PostStatistics> dataPerFolder = getDataForEachFolder();
         List<PostStatistics> data = Files
                 .find(startFolderForSearch, 1, correctFolders, options)
                 .parallel().map(dataPerFolder).collect(Collectors.toList());
@@ -117,10 +128,28 @@ public class Main {
         bWriter.close();
     }
 
+    private static Comparator<? super PostStatistics> getComparator() {
+        return (ps1, ps2) -> {
+            int year = Integer.valueOf(ps1.getYear());
+            int year2 = Integer.valueOf(ps2.getYear());
+
+            if (year < year2)
+                return -1;
+
+            else if (year > year2)
+                return 1;
+
+            return 0;
+        };
+    }
+
     private static Consumer<? super PostStatistics> writeToOutputFile()
             throws IOException {
 
         return ps -> {
+            if (ps.getStatistics().getCount() < 1)
+                return;
+
             try {
                 StringBuilder builder = getFormatedString(ps);
                 bWriter.write(builder.toString());
@@ -142,48 +171,5 @@ public class Main {
 
         builder.append(ps.getStatistics().getMin()).append(";");
         return builder;
-    }
-
-    private static Comparator<? super PostStatistics> getComparator() {
-        return (ps1, ps2) -> {
-            int year = Integer.valueOf(ps1.getYear());
-            int year2 = Integer.valueOf(ps2.getYear());
-
-            if (year < year2)
-                return -1;
-
-            else if (year > year2)
-                return 1;
-
-            return 0;
-        };
-    }
-
-    private static IntSummaryStatistics getSumOfAllData(
-            List<IntSummaryStatistics> summaryStatistics) {
-
-        IntSummaryStatistics result = new IntSummaryStatistics();
-        summaryStatistics.parallelStream().forEach(sumary -> {
-            result.combine(sumary);
-        });
-
-        return result;
-    }
-
-    // TODO: add check for invalid data and if erroroutput is defined print
-    // invalid posts
-    private static Predicate<String> getRowFilter() {
-        return string -> {
-            String errorString = "-9999";
-            boolean yearInValid = string.substring(0, 4).equals(errorString);
-
-            String tempString = string.substring(14, 19);
-            boolean tempInValid = tempString.equals(errorString);
-
-            int temp = Integer.valueOf(tempString.trim());
-            boolean tempInRange = temp > -100 && temp < 100;
-
-            return yearInValid || tempInValid || !tempInRange;
-        };
     }
 }
