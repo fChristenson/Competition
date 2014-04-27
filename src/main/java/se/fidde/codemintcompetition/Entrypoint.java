@@ -25,7 +25,7 @@ import java.util.stream.Collectors;
  * @author Fidde
  *
  */
-public class Main {
+public class Entrypoint {
 
     private static File errorOutputFile;
     private static File outputFile;
